@@ -81,6 +81,24 @@ This log records what I did in each session, what I learned, where I got stuck, 
 
 
 
+## Midsem Break:
+### Fixing a file mix-up and merging Stage 2
+
+**What I did**
+- Copied the window-sticker fix into my repo, but `pytest` still showed 66 tests instead of the expected 78.
+- Used `grep -c "is_whole_number_mpge"` to check whether the new code was actually in my files. Both files returned 0, which proved they were still the old versions.
+- Found the cause: my repo is called `MMA3001_PROJECT_HARSHILDOBARIYA-EV_ENERGY_PREDICTION`, while the instructions and the download both used the name `ev-energy-prediction`. With several similarly named folders in Downloads, the files were not copied into the right place.
+- Fixed it by repackaging the download under a unique name (`STAGE2_FIX_FILES`) and copying the files with `cp` in the terminal instead of dragging in Finder.
+- Confirmed the fix: `grep` returned 6 and 2, and `pytest` showed 78 passed.
+- Reran the full pipeline. My results matched Claude's to the last decimal place (712 vehicles, η_d = 0.796, highway RMSE 2.41 kWh/100 mi), which shows the workflow is reproducible on a different computer.
+- Committed the fix in three parts, pushed, and merged Stage 2 into `main` with my first pull request.
+
+**AI use**
+- Claude diagnosed the problem and gave the `grep` and `cp` commands. I ran every command myself and checked each output against what was expected.
+
+---
+
+
 ## Resources used
 
 - US EPA, Data on Cars Used for Testing Fuel Economy: https://www.epa.gov/compliance-and-fuel-economy-data/data-cars-used-testing-fuel-economy

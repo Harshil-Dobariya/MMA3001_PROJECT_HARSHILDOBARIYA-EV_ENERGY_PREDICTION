@@ -9,8 +9,10 @@ Outputs (all in results/stage2/):
 * drive_cycles.png        : the UDDS and HWFET speed traces
 * wheel_power_example.png : wheel power over the UDDS for one vehicle
 * convergence.csv/.png    : step-size convergence of the cycle integrals
-* exploratory_fit.csv     : physics parameters fitted to ALL vehicles
-* parity_exploratory.png  : measured vs predicted consumption
+* exploratory_fit.csv     : physics parameters fitted with and without the
+                            suspected window-sticker vehicles
+* parity_exploratory.png  : measured vs predicted consumption, flagged
+                            vehicles highlighted
 
 The fit here uses every vehicle and is for checking the physics only. The
 proper train/test evaluation is done in Stage 4.
@@ -29,7 +31,7 @@ from ev_energy import physics_model as pm
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
-CLEAN = ROOT / "data" / "processed" / "ev_clean.csv"
+CLEAN_ALL = ROOT / "data" / "processed" / "ev_clean_with_flagged.csv"
 OUT = ROOT / "results" / "stage2"
 M_PER_MILE = 1609.344
 REFINEMENT_FACTORS = (1, 2, 4, 8, 16, 32)
@@ -131,14 +133,14 @@ def plot_parity(feat: pd.DataFrame, model: pm.PhysicsModel) -> None:
     for ax, name in zip(axes, ("city", "hwy")):
         y = feat[f"{name}_kwh_per_100mi"]
         p = model.predict(feat, name)
-        flag = feat["integer_mpge"]
+        flag = feat["label_value_suspect"].to_numpy()
         ax.scatter(p[~flag], y[~flag], s=10, alpha=0.6, label="Other vehicles")
-        ax.scatter(p[flag], y[flag], s=18, color="tab:red", label="Whole-number MPGe reported")
+        ax.scatter(p[flag], y[flag], s=18, color="tab:red", label="Suspected window-sticker value")
         lims = [10, 80]
         ax.plot(lims, lims, "k--", lw=1)
         ax.set_xlim(lims)
         ax.set_ylim(lims)
-        ax.set_title(f"{'UDDS' if name == 'city' else 'HWFET'} (exploratory, all vehicles)")
+        ax.set_title(f"{'UDDS' if name == 'city' else 'HWFET'} (exploratory, fitted without flagged)")
         ax.set_xlabel("Physics prediction (kWh/100 mi)")
         ax.set_ylabel("Measured (kWh/100 mi)")
         ax.grid(alpha=0.3)
@@ -148,39 +150,55 @@ def plot_parity(feat: pd.DataFrame, model: pm.PhysicsModel) -> None:
     plt.close(fig)
 
 
+def fit_summary(feat: pd.DataFrame, label: str) -> tuple[pm.PhysicsModel, dict]:
+    """Fit the physics model and return it with a row of summary statistics."""
+    model = pm.PhysicsModel().fit(feat)
+    row = {"dataset": label, "n_vehicles": len(feat), **model.params()}
+    for c in ("city", "hwy"):
+        y = feat[f"{c}_kwh_per_100mi"]
+        r = y - model.predict(feat, c)
+        row[f"{c}_rmse"] = float(np.sqrt((r**2).mean()))
+        row[f"{c}_r2"] = float(1 - (r**2).sum() / ((y - y.mean()) ** 2).sum())
+    return model, row
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     cycles = pm.load_epa_cycles(RAW)
-    vehicles = pd.read_csv(CLEAN)
-    feat = pm.add_physics_features(vehicles, cycles)
+    feat_all = pm.add_physics_features(pd.read_csv(CLEAN_ALL), cycles)
+    feat = feat_all[~feat_all["label_value_suspect"]].reset_index(drop=True)
 
-    # Flag vehicles whose reported values are whole-number MPGe on both
-    # cycles. These may be label (adjusted) values rather than raw test
-    # results, and are checked in the report.
-    for c in ("city", "hwy"):
-        mpge = 100 * 33.705 / feat[f"{c}_kwh_per_100mi"]
-        feat[f"{c}_mpge_whole"] = np.isclose(mpge, mpge.round(), atol=0.02)
-    feat["integer_mpge"] = feat["city_mpge_whole"] & feat["hwy_mpge_whole"]
+    _, row_all = fit_summary(feat_all, "with flagged vehicles")
+    model, row_clean = fit_summary(feat, "flagged vehicles excluded")
+    summary = pd.DataFrame([row_all, row_clean])
+    summary.to_csv(OUT / "exploratory_fit.csv", index=False)
 
-    model = pm.PhysicsModel().fit(feat)
-    params = model.params()
-    pd.DataFrame([params]).to_csv(OUT / "exploratory_fit.csv", index=False)
+    print("Exploratory physics fit (all vehicles, physics check only; Stage 4 does train/test)")
+    for _, r in summary.iterrows():
+        print(
+            f"  {r['dataset']:<26} n={r['n_vehicles']:>3}  eta_d={r['eta_d']:.3f}  "
+            f"eta_r={r['eta_r']:.3f}  P_aux={r['p_aux_w']:6.1f} W  "
+            f"city RMSE {r['city_rmse']:.2f} (R2 {r['city_r2']:.3f})  "
+            f"hwy RMSE {r['hwy_rmse']:.2f} (R2 {r['hwy_r2']:.3f})"
+        )
 
-    print("Exploratory fit on all vehicles (physics check only)")
-    print(f"  eta_d = {params['eta_d']:.3f}, eta_r = {params['eta_r']:.3f}, P_aux = {params['p_aux_w']:.1f} W")
-    for c in ("city", "hwy"):
-        r = feat[f"{c}_kwh_per_100mi"] - model.predict(feat, c)
-        y = feat[f"{c}_kwh_per_100mi"]
-        r2 = 1 - (r**2).sum() / ((y - y.mean()) ** 2).sum()
-        print(f"  {c:>4}: RMSE {np.sqrt((r**2).mean()):.2f} kWh/100 mi, R^2 {r2:.3f}")
+    # Ratio of measured to predicted for each flagged vehicle, using the
+    # model fitted without them. Label values should sit near 1/0.7 = 1.43.
+    flagged = feat_all[feat_all["label_value_suspect"]].copy()
+    flagged["city_ratio"] = flagged["city_kwh_per_100mi"] / model.predict(flagged, "city")
+    flagged["hwy_ratio"] = flagged["hwy_kwh_per_100mi"] / model.predict(flagged, "hwy")
+    cols = ["model_year", "make", "model", "city_ratio", "hwy_ratio"]
+    flagged[cols].to_csv(OUT / "flagged_vehicles.csv", index=False)
+    print("\nFlagged vehicles: measured / physics prediction")
+    print(flagged[cols].round(2).to_string(index=False))
 
     veh = example_vehicle(feat)
     plot_drive_cycles(cycles)
     plot_wheel_power(cycles["city"], veh)
-    conv = convergence_study(cycles, veh, params["eta_d"], params["eta_r"])
+    conv = convergence_study(cycles, veh, model.eta_d_, model.eta_r_)
     conv.to_csv(OUT / "convergence.csv", index=False)
     plot_convergence(conv)
-    plot_parity(feat, model)
+    plot_parity(feat_all, model)
 
     print("\nConvergence (example vehicle, consumption kWh/100 mi at dt = 1 s vs finest):")
     for (c, kind, method), g in conv.groupby(["cycle", "interpolant", "method"]):

@@ -21,7 +21,8 @@ Pipeline (see :func:`clean_ev_dataframe`)
 7. Pivot so each vehicle has both a city and a highway result.
 8. Add SI-unit versions of mass and road-load coefficients.
 9. Apply physical plausibility limits.
-10. Add a group identifier for leakage-safe train/test splitting.
+10. Flag (and by default exclude) suspected window-sticker values.
+11. Add a group identifier for leakage-safe train/test splitting.
 
 Every step records how many rows remain, so data losses are traceable.
 
@@ -32,6 +33,18 @@ inconsistently. Most report unadjusted MPGe (typically 70 to 200), while
 some (e.g. Hyundai, Kia, Genesis, Rivian) report kWh/100 mi (typically 15
 to 40). Values of 999 and other values above 500 are placeholders. The unit
 is therefore inferred from magnitude, see :func:`to_kwh_per_100mi`.
+
+Suspected window-sticker values
+-------------------------------
+Some vehicles are reported as whole-number MPGe on both cycles. A physics
+cross-check (Stage 2) showed most of these sit about 1.3 times above the
+physics prediction, the signature of label (adjusted) values, which are
+roughly 0.7 times the raw test result. This was confirmed against
+fueleconomy.gov: the 2024 GMC Hummer EV SUV versions report 59/48, 56/46
+and 51/43 MPGe city/highway in both sources, and the 2022 Chevrolet Bolt EV
+label (131/109) matches the data (129 and 132 / 109) within 2 MPGe. Such
+vehicles are flagged by how their values were reported, not by model
+residuals, see :func:`is_whole_number_mpge`.
 """
 
 from __future__ import annotations
@@ -318,6 +331,37 @@ def reported_unit(value: float) -> str:
     return "kWh/100mi" if value < KWH_UNIT_THRESHOLD else "MPGe"
 
 
+def is_whole_number_mpge(value: float) -> bool:
+    """Return True if a reported value is MPGe and a whole number.
+
+    Raw dynamometer results are normally reported to one decimal place.
+    Whole-number MPGe values are the format of window-sticker (label)
+    values, so they mark a vehicle for checking.
+
+    Parameters
+    ----------
+    value : float
+        Reported ``RND_ADJ_FE`` value.
+
+    Returns
+    -------
+    bool
+        True if the value is interpreted as MPGe and has no fractional part.
+
+    Examples
+    --------
+    >>> is_whole_number_mpge(109.0)
+    True
+    >>> is_whole_number_mpge(184.5)
+    False
+    >>> is_whole_number_mpge(25.0)   # kWh/100 mi, not MPGe
+    False
+    """
+    if reported_unit(value) != "MPGe":
+        return False
+    return bool(np.isclose(value, round(value), atol=1e-6))
+
+
 def aggregate_repeat_tests(tests: pd.DataFrame) -> pd.DataFrame:
     """Average repeated tests of the same vehicle on the same cycle.
 
@@ -335,11 +379,18 @@ def aggregate_repeat_tests(tests: pd.DataFrame) -> pd.DataFrame:
     -------
     pandas.DataFrame
         One row per vehicle configuration and cycle, with columns
-        ``kwh_per_100mi`` (mean), ``n_tests`` and ``kwh_std``.
+        ``kwh_per_100mi`` (mean), ``n_tests``, ``kwh_std`` and
+        ``whole_mpge`` (True if every test was reported as whole-number
+        MPGe).
     """
     keys = VEHICLE_KEY + SPEC_COLUMNS + ["cycle"]
-    grouped = tests.groupby(keys, dropna=False)["kwh_per_100mi"]
-    return grouped.agg(kwh_per_100mi="mean", n_tests="count", kwh_std="std").reset_index()
+    grouped = tests.groupby(keys, dropna=False)
+    return grouped.agg(
+        kwh_per_100mi=("kwh_per_100mi", "mean"),
+        n_tests=("kwh_per_100mi", "count"),
+        kwh_std=("kwh_per_100mi", "std"),
+        whole_mpge=("whole_mpge", "all"),
+    ).reset_index()
 
 
 def pivot_cycles(per_cycle: pd.DataFrame) -> pd.DataFrame:
@@ -357,10 +408,11 @@ def pivot_cycles(per_cycle: pd.DataFrame) -> pd.DataFrame:
     pandas.DataFrame
         Columns ``city_kwh_per_100mi``, ``hwy_kwh_per_100mi``,
         ``city_n_tests``, ``hwy_n_tests``, ``city_kwh_std`` and
-        ``hwy_kwh_std`` alongside the vehicle key and spec columns.
+        ``hwy_kwh_std``, ``city_whole_mpge`` and ``hwy_whole_mpge``
+        alongside the vehicle key and spec columns.
     """
     index = VEHICLE_KEY + SPEC_COLUMNS
-    values = ["kwh_per_100mi", "n_tests", "kwh_std"]
+    values = ["kwh_per_100mi", "n_tests", "kwh_std", "whole_mpge"]
     halves = []
     for cycle in ("city", "hwy"):
         half = per_cycle.loc[per_cycle["cycle"] == cycle, index + values]
@@ -457,7 +509,9 @@ def make_group_id(make: str, model: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def clean_ev_dataframe(raw: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]:
+def clean_ev_dataframe(
+    raw: pd.DataFrame, exclude_label_values: bool = True
+) -> tuple[pd.DataFrame, dict[str, int]]:
     """Run the full cleaning pipeline on raw EPA rows.
 
     Parameters
@@ -465,6 +519,10 @@ def clean_ev_dataframe(raw: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]
     raw : pandas.DataFrame
         Raw EPA rows with original column names (e.g. from
         :func:`load_raw_files`).
+    exclude_label_values : bool, optional
+        If True (default), drop vehicles reported as whole-number MPGe on
+        both cycles (suspected window-sticker values). If False, keep them
+        and mark them in the ``label_value_suspect`` column.
 
     Returns
     -------
@@ -495,6 +553,7 @@ def clean_ev_dataframe(raw: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]
 
     tests["fe_unit_inferred"] = tests["fe_reported"].apply(reported_unit)
     tests["kwh_per_100mi"] = tests["fe_reported"].apply(to_kwh_per_100mi)
+    tests["whole_mpge"] = tests["fe_reported"].apply(is_whole_number_mpge)
     tests = tests.dropna(subset=["kwh_per_100mi"])
     report["rows with a valid efficiency value (sentinels removed)"] = len(tests)
 
@@ -518,6 +577,12 @@ def clean_ev_dataframe(raw: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]
     vehicles = vehicles[in_range & positive_load].reset_index(drop=True)
     report["vehicles passing physical plausibility checks"] = len(vehicles)
 
+    vehicles["label_value_suspect"] = vehicles["city_whole_mpge"] & vehicles["hwy_whole_mpge"]
+    vehicles = vehicles.drop(columns=["city_whole_mpge", "hwy_whole_mpge"])
+    if exclude_label_values:
+        vehicles = vehicles[~vehicles["label_value_suspect"]].reset_index(drop=True)
+        report["vehicles after excluding suspected window-sticker values"] = len(vehicles)
+
     vehicles["group_id"] = [
         make_group_id(m, n) for m, n in zip(vehicles["make"], vehicles["model"])
     ]
@@ -526,13 +591,17 @@ def clean_ev_dataframe(raw: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int]]
     return vehicles, report
 
 
-def clean_ev_data(paths: Iterable[str | Path]) -> tuple[pd.DataFrame, dict[str, int]]:
+def clean_ev_data(
+    paths: Iterable[str | Path], exclude_label_values: bool = True
+) -> tuple[pd.DataFrame, dict[str, int]]:
     """Load raw EPA files and run the full cleaning pipeline.
 
     Parameters
     ----------
     paths : iterable of str or pathlib.Path
         Paths to the raw EPA spreadsheets.
+    exclude_label_values : bool, optional
+        Passed to :func:`clean_ev_dataframe`.
 
     Returns
     -------
@@ -541,36 +610,51 @@ def clean_ev_data(paths: Iterable[str | Path]) -> tuple[pd.DataFrame, dict[str, 
     report : dict of str to int
         Row count after each cleaning step.
     """
-    return clean_ev_dataframe(load_raw_files(paths))
+    return clean_ev_dataframe(load_raw_files(paths), exclude_label_values)
 
 
 def main(
     raw_dir: str | Path = "data/raw",
-    out_path: str | Path = "data/processed/ev_clean.csv",
+    out_dir: str | Path = "data/processed",
 ) -> None:
-    """Command-line entry point: clean all raw files and save a CSV.
+    """Command-line entry point: clean all raw files and save two CSVs.
 
     Run from the repository root with ``python -m ev_energy.data_cleaning``.
+
+    Two files are written:
+
+    * ``ev_clean.csv``: the modelling dataset, with suspected
+      window-sticker values excluded.
+    * ``ev_clean_with_flagged.csv``: the same, but keeping the flagged
+      vehicles (marked in ``label_value_suspect``) for comparison.
 
     Parameters
     ----------
     raw_dir : str or pathlib.Path, optional
         Folder holding the raw EPA ``*testcar*.xlsx`` files.
-    out_path : str or pathlib.Path, optional
-        Where to write the cleaned CSV.
+    out_dir : str or pathlib.Path, optional
+        Folder to write the cleaned CSVs to.
     """
     paths = sorted(Path(raw_dir).glob("*testcar*.xlsx"))
-    vehicles, report = clean_ev_data(paths)
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    vehicles.to_csv(out_path, index=False)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    raw = load_raw_files(paths)
+    with_flagged, _ = clean_ev_dataframe(raw, exclude_label_values=False)
+    vehicles, report = clean_ev_dataframe(raw, exclude_label_values=True)
+    with_flagged.to_csv(out_dir / "ev_clean_with_flagged.csv", index=False)
+    vehicles.to_csv(out_dir / "ev_clean.csv", index=False)
 
     print("Cleaning report")
     for step, rows in report.items():
         print(f"  {rows:>6}  {step}")
+    flagged = with_flagged[with_flagged["label_value_suspect"]]
+    print(f"\nFlagged as suspected window-sticker values: {len(flagged)} vehicles")
+    for _, row in flagged.drop_duplicates(["make", "model"]).iterrows():
+        print(f"    {row['model_year']} {row['make']} {row['model']}")
     print(
         f"\nSaved {len(vehicles)} vehicles "
-        f"({vehicles['group_id'].nunique()} unique models) to {out_path}"
+        f"({vehicles['group_id'].nunique()} unique models) to {out_dir / 'ev_clean.csv'}"
     )
 
 

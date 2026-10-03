@@ -1,0 +1,86 @@
+{
+  "linear": {
+    "city": {},
+    "hwy": {}
+  },
+  "hybrid_linear": {
+    "city": {},
+    "hwy": {}
+  },
+  "tree": {
+    "city": {
+      "model__max_depth": 4,
+      "model__min_samples_leaf": 10
+    },
+    "hwy": {
+      "model__max_depth": 6,
+      "model__min_samples_leaf": 5
+    }
+  },
+  "hybrid_tree": {
+    "city": {
+      "model__max_depth": 10,
+      "model__min_samples_leaf": 3
+    },
+    "hwy": {
+      "model__max_depth": 4,
+      "model__min_samples_leaf": 1
+    }
+  },
+  "svr": {
+    "city": {
+      "model__C": 100.0,
+      "model__epsilon": 1.0,
+      "model__gamma": 0.3
+    },
+    "hwy": {
+      "model__C": 10.0,
+      "model__epsilon": 1.0,
+      "model__gamma": 0.05
+    }
+  },
+  "hybrid_svr": {
+    "city": {
+      "model__C": 100.0,
+      "model__epsilon": 1.0,
+      "model__gamma": 0.3
+    },
+    "hwy": {
+      "model__C": 100.0,
+      "model__epsilon": 0.5,
+      "model__gamma": 0.3
+    }
+  },
+  "mlp": {
+    "city": {
+      "model__regressor__alpha": 0.001,
+      "model__regressor__hidden_layer_sizes": [
+        30,
+        15
+      ]
+    },
+    "hwy": {
+      "model__regressor__alpha": 0.01,
+      "model__regressor__hidden_layer_sizes": [
+        30,
+        15
+      ]
+    }
+  },
+  "hybrid_mlp": {
+    "city": {
+      "model__regressor__alpha": 0.1,
+      "model__regressor__hidden_layer_sizes": [
+        30,
+        15
+      ]
+    },
+    "hwy": {
+      "model__regressor__alpha": 0.01,
+      "model__regressor__hidden_layer_sizes": [
+        30,
+        15
+      ]
+    }
+  }
+}

@@ -98,6 +98,9 @@ This log records what I did in each session, what I learned, where I got stuck, 
 
 ---
 
+## Week 9
+### 
+
 
 ## Resources used
 
@@ -105,4 +108,3 @@ This log records what I did in each session, what I learned, where I got stuck, 
 - US EPA, Dynamometer Drive Schedules: https://epa.gov/vehicle-and-fuel-emissions-testing/dynamometer-drive-schedules
 - US DOE/EPA, fueleconomy.gov: https://www.fueleconomy.gov
 - MMA3001 unit notes: Week 1 (version control, documentation, testing), Week 5.5 and 5.6 (evaluation and data splitting), Week 6 (numerical integration), Week 7.1 (finite differences)
-- [Add anything else you read or watched yourself.]

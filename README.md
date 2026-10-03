@@ -70,6 +70,14 @@ python scripts/stage2_physics.py
 
 Outputs are written to `results/stage2/`.
 
+Run Stage 3 (train/test split, hyperparameter tuning and cross-validated model comparison on the training set):
+
+```bash
+python scripts/stage3_models.py
+```
+
+Outputs are written to `results/stage3/`. The held-out test set is created and saved here, but is not used for any fitting, tuning or model choice until Stage 4.
+
 ## Testing
 
 ```bash
@@ -79,9 +87,6 @@ pytest
 Runs all unit tests and the docstring examples.
 
 ## Project log
-
-- **Week 10:** Project scoped and approved. Repository set up. Data cleaning pipeline written and tested.
-- **Week 10:** Physics-based energy model (road-load integration over UDDS and HWFET) written and verified against analytical solutions, EPA cycle benchmarks and a manufactured solution. Step-size convergence study completed. Physics cross-check identified vehicles whose reported values are window-sticker figures rather than test results; confirmed against fueleconomy.gov and excluded by a reporting-format rule.
 
 ## AI use
 

@@ -99,7 +99,26 @@ This log records what I did in each session, what I learned, where I got stuck, 
 ---
 
 ## Week 9
-### 
+### Stage 3, ML and hybrid models
+
+**What I did**
+- Created a new branch, `ml-models`, for this stage.
+- Split the data by vehicle model so no model appears in both sets: 537 training vehicles (210 models) and 175 test vehicles (53 models). The two sets have similar averages and spreads (city mean 25.5 vs 25.1 kWh/100 mi). The test set was saved but not used for anything in this stage.
+- Trained the four model families from Week 5 (linear regression, decision tree, RBF SVR and an MLP neural network), each in a pipeline with `StandardScaler`, plus a mean baseline.
+- Built hybrid models: the physics model predicts first, and an ML model learns the residual (what physics gets wrong).
+- Tuned hyperparameters with grouped 5-fold cross-validation on the training set only. Inside every fold the physics model was refitted on that fold's training rows, so the hybrids never saw validation targets.
+- Wrote a leakage test: it adds 100 kWh/100 mi to every target in one fold and checks the predictions for that fold do not change. It passed.
+- My first run gave different numbers from Claude's (mean baseline 5.301 vs 5.338). Since the mean baseline has no randomness, the folds must have been assigned differently. scikit-learn's `GroupKFold` assigned vehicle models to folds differently in different library versions (I have Python 3.14.8 and scikit-learn 1.9.1). Fixed by assigning folds explicitly with a seeded shuffle.
+- After the fix my results matched exactly, except the decision trees, which differed by up to 0.10 kWh/100 mi because of tie-breaking changes between scikit-learn 1.8 and 1.9. The selected model was unaffected. Locked my exact package versions in `requirements-lock.txt`.
+- Comparing three different fold assignments showed the gap between the top models (about 0.05) was smaller than the variation from fold assignment alone (about 0.1). So I repeated cross-validation with five fold assignments and compared mean RMSE.
+- Results: city, Physics + SVR was clearly best (2.88 ± 0.10 vs 3.39 for physics alone, a 15% improvement). Highway, the top four models were within their run-to-run spread (2.36 to 2.43), so no model meaningfully beat physics, which was also by far the most stable (±0.004).
+- Fixed the model-selection rule before opening the test set: one model for both cycles, lowest average of city and highway mean RMSE. Selected: Physics + SVR (2.62 kWh/100 mi).
+- 110 tests passing.
+
+**AI use**
+- Claude designed the split, models and cross-validation, and wrote the code and tests. I ran everything on my own machine, and the mismatch between my results and Claude's is what exposed the fold-assignment problem. Claude diagnosed it and wrote the fix; I confirmed it by rerunning and comparing the outputs line by line. The model-selection rule was set before the test set was opened.
+
+---
 
 
 ## Resources used

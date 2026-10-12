@@ -37,14 +37,18 @@ def make_raw_row(**overrides):
         "Target Coef C (lbf/mph**2)": 0.015,
         "Test Procedure Description": dc.CITY_PROCEDURE,
         "Test Fuel Type Description": dc.EV_FUEL_DESCRIPTION,
-        "RND_ADJ_FE": 150.0,
+        "RND_ADJ_FE": 150.5,
     }
     row.update(overrides)
     return row
 
 
-def make_vehicle_pair(vehicle_id="TV1", city_fe=150.0, hwy_fe=130.0, **overrides):
-    """Return city and highway raw rows for one vehicle."""
+def make_vehicle_pair(vehicle_id="TV1", city_fe=150.5, hwy_fe=130.5, **overrides):
+    """Return city and highway raw rows for one vehicle.
+
+    Defaults use one decimal place, like real dynamometer results, so the
+    vehicle is not flagged as a suspected window-sticker value.
+    """
     city = make_raw_row(**{"Test Vehicle ID": vehicle_id, "RND_ADJ_FE": city_fe, **overrides})
     hwy = make_raw_row(
         **{
@@ -151,8 +155,8 @@ def test_pipeline_pairs_city_and_highway():
     raw = pd.DataFrame(make_vehicle_pair())
     vehicles, report = dc.clean_ev_dataframe(raw)
     assert len(vehicles) == 1
-    assert to_close(vehicles.loc[0, "city_kwh_per_100mi"], 3370.5 / 150.0)
-    assert to_close(vehicles.loc[0, "hwy_kwh_per_100mi"], 3370.5 / 130.0)
+    assert to_close(vehicles.loc[0, "city_kwh_per_100mi"], 3370.5 / 150.5)
+    assert to_close(vehicles.loc[0, "hwy_kwh_per_100mi"], 3370.5 / 130.5)
     assert report["vehicles passing physical plausibility checks"] == 1
 
 
@@ -163,9 +167,9 @@ def test_vehicle_missing_one_cycle_is_dropped():
 
 
 def test_repeat_tests_are_averaged():
-    rows = make_vehicle_pair(city_fe=150.0) + make_vehicle_pair(city_fe=100.0)
+    rows = make_vehicle_pair(city_fe=150.5) + make_vehicle_pair(city_fe=100.5)
     vehicles, _ = dc.clean_ev_dataframe(pd.DataFrame(rows))
-    expected = (3370.5 / 150.0 + 3370.5 / 100.0) / 2
+    expected = (3370.5 / 150.5 + 3370.5 / 100.5) / 2
     assert len(vehicles) == 1
     assert vehicles.loc[0, "city_n_tests"] == 2
     assert to_close(vehicles.loc[0, "city_kwh_per_100mi"], expected)
@@ -194,7 +198,7 @@ def test_non_ev_and_non_cd_rows_are_ignored():
 
 def test_mixed_units_give_same_result():
     # One vehicle reports MPGe, an identical one reports kWh/100 mi.
-    mpge_city, mpge_hwy = 150.0, 130.0
+    mpge_city, mpge_hwy = 150.5, 130.5
     kwh_city, kwh_hwy = 3370.5 / mpge_city, 3370.5 / mpge_hwy
     rows = make_vehicle_pair("A", mpge_city, mpge_hwy) + make_vehicle_pair("B", kwh_city, kwh_hwy)
     vehicles, _ = dc.clean_ev_dataframe(pd.DataFrame(rows))
@@ -207,6 +211,49 @@ def test_implausible_consumption_is_removed():
     raw = pd.DataFrame(make_vehicle_pair(city_fe=2.0, hwy_fe=2.0))
     vehicles, _ = dc.clean_ev_dataframe(raw)
     assert vehicles.empty
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [(109.0, True), (131.0, True), (184.5, False), (25.0, False), (999.0, False), (np.nan, False)],
+)
+def test_is_whole_number_mpge(value, expected):
+    assert dc.is_whole_number_mpge(value) is expected
+
+
+def test_whole_number_mpge_on_both_cycles_is_excluded_by_default():
+    rows = make_vehicle_pair("LABEL", 131.0, 109.0) + make_vehicle_pair("RAW", 184.5, 173.4)
+    vehicles, report = dc.clean_ev_dataframe(pd.DataFrame(rows))
+    assert list(vehicles["vehicle_id"]) == ["RAW"]
+    assert report["vehicles after excluding suspected window-sticker values"] == 1
+
+
+def test_flagged_vehicles_can_be_kept_and_marked():
+    rows = make_vehicle_pair("LABEL", 131.0, 109.0) + make_vehicle_pair("RAW", 184.5, 173.4)
+    vehicles, report = dc.clean_ev_dataframe(pd.DataFrame(rows), exclude_label_values=False)
+    flags = dict(zip(vehicles["vehicle_id"], vehicles["label_value_suspect"]))
+    assert flags == {"LABEL": True, "RAW": False}
+    assert "vehicles after excluding suspected window-sticker values" not in report
+
+
+def test_whole_number_on_one_cycle_only_is_not_flagged():
+    rows = make_vehicle_pair("MIXED", 131.0, 109.4)
+    vehicles, _ = dc.clean_ev_dataframe(pd.DataFrame(rows))
+    assert len(vehicles) == 1
+
+
+def test_whole_number_kwh_values_are_not_flagged():
+    # 25 and 28 are kWh/100 mi (below the unit threshold), not MPGe.
+    rows = make_vehicle_pair("KWH", 25.0, 28.0)
+    vehicles, _ = dc.clean_ev_dataframe(pd.DataFrame(rows))
+    assert len(vehicles) == 1
+
+
+def test_one_decimal_repeat_test_unflags_the_cycle():
+    # Two city tests, one whole and one decimal: not all whole, so not flagged.
+    rows = make_vehicle_pair("REP", 131.0, 109.0) + make_vehicle_pair("REP", 130.6, 109.0)
+    vehicles, _ = dc.clean_ev_dataframe(pd.DataFrame(rows))
+    assert len(vehicles) == 1
 
 
 def test_missing_required_column_raises():

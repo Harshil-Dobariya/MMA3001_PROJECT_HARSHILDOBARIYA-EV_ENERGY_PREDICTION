@@ -1,0 +1,3 @@
+set,vehicles,models,city_mean,city_std,hwy_mean,hwy_std
+train,537,210,25.5,5.29,27.31,4.41
+test,175,53,25.12,5.47,27.69,4.7

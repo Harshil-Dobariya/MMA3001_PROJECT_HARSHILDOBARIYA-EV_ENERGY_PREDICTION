@@ -1,0 +1,5 @@
+{
+  "selected_model": "hybrid_svr",
+  "rule": "lowest average of city and highway mean CV RMSE (5 repeated grouped 5-fold runs)",
+  "average_cv_rmse": 2.6224
+}

@@ -78,6 +78,14 @@ python scripts/stage3_models.py
 
 Outputs are written to `results/stage3/`. The held-out test set is created and saved here, but is not used for any fitting, tuning or model choice until Stage 4.
 
+Run Stage 4 (final evaluation on the held-out test set, uncertainty, temporal check, sensitivity analysis and comparison with official EPA figures for four well-known EVs):
+
+```bash
+python scripts/stage4_validation.py
+```
+
+Outputs are written to `results/stage4/`. This is the only stage that uses the test set.
+
 ## Testing
 
 ```bash
@@ -87,6 +95,11 @@ pytest
 Runs all unit tests and the docstring examples.
 
 ## Project log
+
+- **Week 10:** Project scoped and approved. Repository set up. Data cleaning pipeline written and tested.
+- **Week 10:** Physics-based energy model (road-load integration over UDDS and HWFET) written and verified against analytical solutions, EPA cycle benchmarks and a manufactured solution. Step-size convergence study completed. Physics cross-check identified vehicles whose reported values are window-sticker figures rather than test results; confirmed against fueleconomy.gov and excluded by a reporting-format rule.
+- **Week 10:** Stage 3: leakage-safe split by vehicle model (537 training, 175 test vehicles). Linear regression, decision tree, SVR and neural-network models, plus hybrids that learn the physics model's residual, tuned and compared by grouped 5-fold cross-validation on the training set only. Folds assigned explicitly after results differed between computers. Cross-validation repeated with 5 fold assignments; on the highway the top models differ by less than their run-to-run spread. Physics + SVR selected for Stage 4 by a rule fixed before opening the test set.
+- **Week 10:** Stage 4: test set opened once. The selected Physics + SVR model did not beat physics alone on unseen vehicle models (city RMSE 3.82 vs 3.62 kWh/100 mi), and failed badly in the temporal check, because of extrapolation to inputs at the edge of the training data. Physics alone was the most robust model and the only one whose responses to mass and drag were physically correct for every vehicle.
 
 ## AI use
 

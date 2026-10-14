@@ -120,6 +120,27 @@ This log records what I did in each session, what I learned, where I got stuck, 
 
 ---
 
+ ## Week 11: Stage 4, final validation on the test set
+
+**What I did**
+- Created a `validation` branch and opened the held-out test set (175 vehicles, 53 models) for the first and only time. The model choice and hyperparameters from Stage 3 were not changed.
+- Evaluated every model on the test set. The selected model, Physics + SVR, did not beat physics alone: test RMSE 3.82 vs 3.62 kWh/100 mi (city) and 2.80 vs 2.39 (highway).
+- Did not switch to the model that scored best on the test set (Physics + MLP, 3.06 city), because choosing a model using the test set would make its test score optimistic in the same way as a CV score.
+- Added 95% confidence intervals by resampling whole vehicle models (bootstrap). The intervals are wide (physics city RMSE 3.62, interval 2.75 to 4.50), so with 53 test models no model was clearly better than physics.
+- Failure analysis: the worst error was the 2025 Maserati Grecale Folgore. Its road-load inputs are at the edge of the training data (f0 = 285 N). Physics predicted 31.7 kWh/100 mi, the hybrid SVR 51.6, measured 26.9.
+- Added a domain check that flags test vehicles with any input outside the training 1st to 99th percentile range: 4 models were flagged. On them, the Physics + tree city error rose from 3.29 to 6.89.
+- The hybrid SVR had a lower typical error than physics (city MAE 2.20 vs 2.79) but much larger rare misses, which RMSE penalises.
+- Temporal check (train on 2022 to 2024, test on 41 new 2025 to 2026 models): physics was best on highway (RMSE 1.18, R² 0.84). Physics + SVR scored R² −0.58, worse than predicting the average.
+- Sensitivity analysis (±10% mass and drag): physics responded in the physically correct direction for every vehicle. Mass mattered more in the city (elasticity 0.43) than on the highway (0.12), and drag the reverse (0.19 vs 0.46). Every flexible model gave wrong-direction responses for some vehicles; Physics + SVR predicted lower highway consumption for a heavier car in 33% of test vehicles.
+- Compared four well-known EVs with the official EPA figures I looked up on fueleconomy.gov. Physics + SVR was close for mainstream cars (Model 3: 129.9 vs 132 MPGe). Physics underestimated their efficiency by 8 to 13% because it assumes one average drivetrain efficiency.
+- Range estimates using an assumed charging efficiency of 85 to 95%: Ioniq 6 322 to 360 miles (EPA 361), Kia EV6 220 to 245 miles (EPA 232).
+- My results matched Claude's except the decision-tree models, the same scikit-learn version difference found in Stage 3. My results are the official ones. 130 tests passing.
+
+**AI use**
+- Claude designed and wrote the validation code, tests and figures. I ran everything on my own machine and compared the output line by line with Claude's. I looked up the official EPA figures for the four EVs myself. The decision not to change the selected model after seeing the test results was based on the selection rule fixed in Stage 3.
+
+---
+
 
 ## Resources used
 

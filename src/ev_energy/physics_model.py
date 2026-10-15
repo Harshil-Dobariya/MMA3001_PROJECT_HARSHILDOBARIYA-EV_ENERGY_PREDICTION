@@ -71,11 +71,15 @@ J_PER_M_TO_KWH_PER_100MI = M_PER_100MI / J_PER_KWH
 INTEGRATORS = ("trapezoid", "simpson")
 
 #: Vehicles processed together in :func:`cycle_energy_terms`. Chosen in
-#: Stage 5 (scripts/stage5_performance.py): chunks of about 32 vehicles keep
-#: each temporary array (32 x 1370 doubles, about 350 kB) inside the CPU's
-#: L2 cache, which was 1.8 times faster than processing all 712 vehicles at
-#: once on the development machine. The best value depends on the CPU.
-DEFAULT_CHUNK_SIZE = 32
+#: Stage 5 (scripts/stage5_performance.py). The best value depends on the
+#: CPU cache: on an Intel Xeon with a 1 MB L2 cache, chunks of 32 vehicles
+#: (about 350 kB per temporary array) were fastest; on the target machine
+#: (Apple Silicon, much larger L2 cache) processing about 712 vehicles at
+#: once (about 7.8 MB per array) was fastest. 712 is used: on the target
+#: machine it matches the speed of processing everything at once, while
+#: capping memory use as the dataset grows (at 7,120 vehicles, peak memory
+#: is about 23 MB instead of 234 MB).
+DEFAULT_CHUNK_SIZE = 712
 
 
 # ---------------------------------------------------------------------------
@@ -424,10 +428,10 @@ def cycle_energy_terms(
     method : {"trapezoid", "simpson"}
         Integration rule.
     chunk_size : int or None, optional
-        Number of vehicles processed together. Processing all vehicles at
-        once (``None``) creates temporary arrays too large for the CPU cache,
-        which Stage 5 showed is slower. Chunks small enough to fit in cache
-        give identical results faster. See :data:`DEFAULT_CHUNK_SIZE`.
+        Number of vehicles processed together. ``None`` processes all at
+        once, which makes temporary arrays (and memory use) grow with the
+        number of vehicles. Any chunk size gives identical results; the
+        fastest depends on the CPU cache. See :data:`DEFAULT_CHUNK_SIZE`.
 
     Returns
     -------

@@ -1,0 +1,18 @@
+machine,vehicles,chunk_size,array_kb,min_s
+Intel Xeon 2.8 GHz (1 MB L2),712,1,11.0,0.0325
+Intel Xeon 2.8 GHz (1 MB L2),712,4,43.8,0.0157
+Intel Xeon 2.8 GHz (1 MB L2),712,16,175.4,0.0105
+Intel Xeon 2.8 GHz (1 MB L2),712,32,350.7,0.0094
+Intel Xeon 2.8 GHz (1 MB L2),712,64,701.4,0.0145
+Intel Xeon 2.8 GHz (1 MB L2),712,128,1402.9,0.0145
+Intel Xeon 2.8 GHz (1 MB L2),712,256,2805.8,0.0166
+Intel Xeon 2.8 GHz (1 MB L2),712,all,7803.9,0.0169
+Intel Xeon 2.8 GHz (1 MB L2),7120,1,11.0,0.3250
+Intel Xeon 2.8 GHz (1 MB L2),7120,4,43.8,0.1536
+Intel Xeon 2.8 GHz (1 MB L2),7120,16,175.4,0.1013
+Intel Xeon 2.8 GHz (1 MB L2),7120,32,350.7,0.0959
+Intel Xeon 2.8 GHz (1 MB L2),7120,64,701.4,0.1003
+Intel Xeon 2.8 GHz (1 MB L2),7120,128,1402.9,0.1144
+Intel Xeon 2.8 GHz (1 MB L2),7120,256,2805.8,0.1185
+Intel Xeon 2.8 GHz (1 MB L2),7120,712,7803.9,0.1811
+Intel Xeon 2.8 GHz (1 MB L2),7120,all,78039.0,0.2341

@@ -1,0 +1,8 @@
+{
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "processor": "arm",
+  "cpu_cores": 12,
+  "python": "3.14.8",
+  "numpy": "2.5.3",
+  "scikit-learn": "1.9.1"
+}

@@ -86,6 +86,14 @@ python scripts/stage4_validation.py
 
 Outputs are written to `results/stage4/`. This is the only stage that uses the test set.
 
+Run Stage 5 (performance: baseline vs improved physics kernel, FLOPs and arithmetic intensity, cache-sized chunking, time-step trade-off, pipeline profiling, model costs and parallel tuning):
+
+```bash
+python scripts/stage5_performance.py
+```
+
+Outputs are written to `results/stage5/`. Timings depend on the computer; the machine details are saved in `results/stage5/machine.json`.
+
 ## Testing
 
 ```bash

@@ -141,10 +141,47 @@ This log records what I did in each session, what I learned, where I got stuck, 
 
 ---
 
+## Week 11: Stage 5, optimisation and performance
+
+**What I did**
+- Created a `performance` branch.
+- Implemented the physics kernel (wheel power integrated over a drive cycle for every vehicle) four ways: pure Python loops (baseline), NumPy with a loop over vehicles, fully vectorised NumPy, and NumPy in chunks of vehicles. All four give the same answers (maximum relative difference 3 × 10⁻¹⁵, round-off level), checked by tests.
+- On my Mac (Apple Silicon, 12 cores), vectorised NumPy was 104 times faster than Python loops for 712 vehicles (0.0023 s vs 0.24 s).
+- Counted the FLOPs: 10 per vehicle per time sample (v² is shared across vehicles, so it is not counted per vehicle), about 9.75 million for one city cycle.
+- Estimated arithmetic intensity: 0.06 FLOP/byte for NumPy as written (every operation writes a temporary array that the next one reads back) and 0.63 FLOP/byte for an ideal fused loop. Both are far below a modern CPU's machine balance, so the kernel is memory-bandwidth bound. It achieved about 4 GFLOP/s, a small fraction of the processor's peak.
+- Chunk-size sweep: on Claude's test machine (Intel Xeon, 1 MB L2 cache), chunks of 32 vehicles were fastest, because the full 7.8 MB arrays did not fit in cache. On my Mac, processing all 712 vehicles at once was fastest, because Apple Silicon's much larger cache holds the full arrays. Chose a chunk size of 712: the same speed as full vectorisation on my machine, but memory capped as the dataset grows (23.7 MB instead of 234 MB at 7,120 vehicles). Kept the Xeon results in the repository as a reference.
+- Time step: halving the step doubles the run time. At EPA's 1 s step the numerical error is 1.3% (city) and 0.35% (highway), much smaller than the model error of about 12%, so the 1 s step is justified.
+- Profiled one full cross-validation run with `cProfile`: neural-network training took about 80% of the time (3.16 of 3.94 s).
+- Model costs: physics trains in 0.7 ms and the MLP in 181 ms, about 260 times slower, for similar cross-validated accuracy (2.91 vs 2.72 kWh/100 mi).
+- Parallel hyperparameter tuning on 12 cores gave about a 2 times speed-up (1.9 to 2.2 times over two runs), with the same hyperparameters chosen.
+- 153 tests passing.
+
+**AI use**
+- Claude wrote the four kernel implementations, the timing and memory tools, the FLOP counts and the Stage 5 script. Claude's first FLOP count was 11 per sample; it corrected this to 10 on noticing that v² is computed once per time step, not per vehicle. Claude initially recommended chunks of 32 based on its own machine; my results showed this was slower on my Mac, and the default was changed to 712 based on my measurements. I ran everything on my machine and checked the outputs.
+
+---
 
 ## Resources used
 
-- US EPA, Data on Cars Used for Testing Fuel Economy: https://www.epa.gov/compliance-and-fuel-economy-data/data-cars-used-testing-fuel-economy
-- US EPA, Dynamometer Drive Schedules: https://epa.gov/vehicle-and-fuel-emissions-testing/dynamometer-drive-schedules
-- US DOE/EPA, fueleconomy.gov: https://www.fueleconomy.gov
-- MMA3001 unit notes: Week 1 (version control, documentation, testing), Week 5.5 and 5.6 (evaluation and data splitting), Week 6 (numerical integration), Week 7.1 (finite differences)
+### Data and official figures
+- US EPA, Data on Cars Used for Testing Fuel Economy (model years 2022 to 2026): https://www.epa.gov/compliance-and-fuel-economy-data/data-cars-used-testing-fuel-economy
+- US EPA, Dynamometer Drive Schedules (UDDS and HWFET speed traces): https://epa.gov/vehicle-and-fuel-emissions-testing/dynamometer-drive-schedules
+- US DOE/EPA, fueleconomy.gov: used to check window-sticker values (2022 Chevrolet Bolt EV, 2024 GMC Hummer EV SUV) and to look up official label MPGe for four well-known EVs (2024 Tesla Model 3 RWD, Tesla Model Y Long Range AWD, Hyundai Ioniq 6 Long Range RWD, Kia EV6 Standard Range RWD): https://www.fueleconomy.gov
+- Kia America, 2024 EV6 pricing release (battery capacity 58.0 kWh and EPA range 232 miles for the EV6 Light RWD): https://kiamedia.com/us/en/models/ev6/2024
+- Carscoops, 2024 Hyundai Ioniq 6 range figures (77.4 kWh battery, EPA range 361 miles for the Long Range RWD on 18-inch wheels): https://carscoops.com/?p=2601849
+
+### MMA3001 unit notes
+- Week 1: version control, documenting code, responsible use of AI, testing
+- Week 2.1: optimisation and profiling (timing, profilers, FLOPs, memory bandwidth, arithmetic intensity, cache hierarchy)
+- Week 2.2: numerical errors (round-off when comparing implementations)
+- Week 3.4: spline interpolation (PCHIP used to refine the drive cycles without overshoot)
+- Weeks 5.1 to 5.4: linear regression, decision trees, support-vector regression, neural networks
+- Weeks 5.5 and 5.6: evaluating regression performance, training data evaluation and splitting
+- Week 6: numerical integration (trapezoidal and Simpson's rules)
+- Week 7.1: finite-difference derivatives
+
+### Software documentation
+- scikit-learn documentation (pipelines, GroupKFold, GridSearchCV, SVR, MLPRegressor): https://scikit-learn.org/stable/
+- Python documentation, the Python profilers (cProfile): https://docs.python.org/3/library/profile.html
+- Python documentation, tracemalloc (memory measurement): https://docs.python.org/3/library/tracemalloc.html
+- NumPy documentation, legacy random generation (RandomState, used for reproducible folds): https://numpy.org/doc/stable/reference/random/legacy.html

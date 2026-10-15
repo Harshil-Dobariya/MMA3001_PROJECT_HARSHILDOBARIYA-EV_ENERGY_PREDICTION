@@ -227,6 +227,7 @@ def tune(
     cycle: str,
     residual: bool = False,
     n_folds: int = N_FOLDS,
+    n_jobs: int | None = 1,
 ) -> dict:
     """Choose hyperparameters by grouped cross-validation on training data.
 
@@ -246,6 +247,10 @@ def tune(
         inside every fold for the actual comparison.
     n_folds : int, optional
         Number of grouped folds.
+    n_jobs : int or None, optional
+        CPU cores used to fit grid candidates in parallel. ``1`` runs them
+        one after another; ``-1`` uses every core. The result is the same
+        either way; only the run time changes (compared in Stage 5).
 
     Returns
     -------
@@ -263,7 +268,7 @@ def tune(
         grid,
         cv=group_kfold_indices(train, n_folds),
         scoring="neg_root_mean_squared_error",
-        n_jobs=1,
+        n_jobs=n_jobs,
     )
     search.fit(train, y)
     return dict(search.best_params_)

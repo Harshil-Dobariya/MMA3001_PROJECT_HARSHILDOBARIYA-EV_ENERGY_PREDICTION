@@ -70,6 +70,13 @@ J_PER_M_TO_KWH_PER_100MI = M_PER_100MI / J_PER_KWH
 #: Supported integration methods.
 INTEGRATORS = ("trapezoid", "simpson")
 
+#: Vehicles processed together in :func:`cycle_energy_terms`. Chosen in
+#: Stage 5 (scripts/stage5_performance.py): chunks of about 32 vehicles keep
+#: each temporary array (32 x 1370 doubles, about 350 kB) inside the CPU's
+#: L2 cache, which was 1.8 times faster than processing all 712 vehicles at
+#: once on the development machine. The best value depends on the CPU.
+DEFAULT_CHUNK_SIZE = 32
+
 
 # ---------------------------------------------------------------------------
 # Drive cycles
@@ -404,6 +411,7 @@ def cycle_energy_terms(
     f1: np.ndarray,
     f2: np.ndarray,
     method: str = "trapezoid",
+    chunk_size: int | None = DEFAULT_CHUNK_SIZE,
 ) -> dict[str, np.ndarray]:
     """Compute the physics terms of the energy model for one cycle.
 
@@ -415,6 +423,11 @@ def cycle_energy_terms(
         Vehicle parameters, shape ``(n_vehicles,)``.
     method : {"trapezoid", "simpson"}
         Integration rule.
+    chunk_size : int or None, optional
+        Number of vehicles processed together. Processing all vehicles at
+        once (``None``) creates temporary arrays too large for the CPU cache,
+        which Stage 5 showed is slower. Chunks small enough to fit in cache
+        give identical results faster. See :data:`DEFAULT_CHUNK_SIZE`.
 
     Returns
     -------
@@ -422,12 +435,22 @@ def cycle_energy_terms(
         ``e_pos_j`` and ``e_neg_j`` (J, per vehicle), plus ``dist_m`` and
         ``duration_s`` (same for every vehicle, broadcast to the same shape).
     """
+    mass_kg, f0, f1, f2 = (np.atleast_1d(np.asarray(x, dtype=float)) for x in (mass_kg, f0, f1, f2))
+    n = len(mass_kg)
+    if chunk_size is not None and chunk_size < 1:
+        raise ValueError("chunk_size must be at least 1, or None.")
+    step = n if chunk_size is None else chunk_size
     accel = finite_difference_acceleration(cycle.speed_mps, cycle.dt)
-    p_w = wheel_power(cycle.speed_mps, accel, mass_kg, f0, f1, f2)
-    n = p_w.shape[0]
+    e_pos = np.empty(n)
+    e_neg = np.empty(n)
+    for start in range(0, n, max(step, 1)):
+        sl = slice(start, start + step)
+        p_w = wheel_power(cycle.speed_mps, accel, mass_kg[sl], f0[sl], f1[sl], f2[sl])
+        e_pos[sl] = integrate(np.maximum(p_w, 0.0), cycle.dt, method)
+        e_neg[sl] = integrate(np.maximum(-p_w, 0.0), cycle.dt, method)
     return {
-        "e_pos_j": integrate(np.maximum(p_w, 0.0), cycle.dt, method),
-        "e_neg_j": integrate(np.maximum(-p_w, 0.0), cycle.dt, method),
+        "e_pos_j": e_pos,
+        "e_neg_j": e_neg,
         "dist_m": np.full(n, float(integrate(cycle.speed_mps, cycle.dt, method))),
         "duration_s": np.full(n, cycle.duration_s),
     }

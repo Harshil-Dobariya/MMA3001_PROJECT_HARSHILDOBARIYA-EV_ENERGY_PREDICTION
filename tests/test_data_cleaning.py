@@ -288,3 +288,18 @@ def test_load_raw_files_round_trip(tmp_path):
 def to_close(a, b, rel=1e-9):
     """Return True if a and b agree to a relative tolerance."""
     return math.isclose(a, b, rel_tol=rel)
+
+
+def test_command_line_entry_point_writes_both_files(tmp_path):
+    # Two vehicles saved as a raw EPA-style spreadsheet: one normal, one
+    # with whole-number (window-sticker) values.
+    rows = make_vehicle_pair("RAW", 150.5, 130.5) + make_vehicle_pair("LABEL", 131.0, 109.0)
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    pd.DataFrame(rows).to_excel(raw_dir / "24-testcar-test.xlsx", index=False)
+    out_dir = tmp_path / "processed"
+    dc.main(raw_dir, out_dir)
+    clean = pd.read_csv(out_dir / "ev_clean.csv")
+    flagged = pd.read_csv(out_dir / "ev_clean_with_flagged.csv")
+    assert list(clean["vehicle_id"]) == ["RAW"]
+    assert len(flagged) == 2

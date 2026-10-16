@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ev_energy"
-version = "0.1.0"
+version = "1.0.0"
 description = "Physics-based and machine-learning prediction of EV energy consumption from EPA test data"
 requires-python = ">=3.10"
 

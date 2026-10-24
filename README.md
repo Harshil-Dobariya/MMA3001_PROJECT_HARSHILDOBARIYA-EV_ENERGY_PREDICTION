@@ -196,7 +196,7 @@ The test set was used once, with no change to the model choice afterwards.
 ## Limitations
 
 - **Missing inputs.** The best error (about 2.7 to 3.6 kWh/100 mi) is far above the measurement noise floor (0.16), because the data lacks inputs such as motor type, tyres and battery chemistry.
-- **Constant efficiency.** The physics model assumes one drivetrain efficiency for all vehicles and speeds, so it underestimates the efficiency of the best vehicles by 8 to 13%.
+- **Constant efficiency.** The physics model assumes one drivetrain efficiency for all vehicles and speeds, so it underestimates the efficiency of the best vehicles by 5 to 13%.
 - **Small test set.** With 53 test vehicle models, the 95% intervals are wide and no model is clearly better than physics.
 - **Extrapolation.** Data-driven models are unreliable outside the training range; any use of a hybrid should check inputs with `out_of_domain` and fall back to physics.
 - **Window-sticker exclusion.** The whole-number rule also removed about 10 vehicles that are probably genuine test results.

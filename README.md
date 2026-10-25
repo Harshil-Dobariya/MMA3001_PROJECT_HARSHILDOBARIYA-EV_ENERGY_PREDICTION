@@ -215,7 +215,7 @@ Docstrings follow the NumPy style.
 
 ## AI use
 
-Claude (Anthropic) was used throughout, for designing the workflow, writing code, tests and figures, and explaining concepts. All code was run and checked on my own machine, and the outputs were compared against expected values and against Claude's own runs. Claude's errors and corrections are recorded in `learning_log.md`, including an incorrect FLOP count and a chunk size that my own measurements overturned. Decisions on the project scope, dataset, the exclusion of window-sticker values, the model-selection rule and the final recommendation remained mine. Full disclosure and reflection are in the project report.
+Claude (Anthropic) was used throughout, for help in designing the workflow, writing majority of the code, tests and figures, and explaining concepts where there were gaps. All code was run and checked on my own machine, and the outputs were compared against expected values and against Claude's own runs. Claude's errors and corrections are recorded in `learning_log.md`, including an incorrect FLOP count and a chunk size that my own measurements overturned. Decisions on the project remained mine. Full disclosure and reflection are in the project report.
 
 ## Data sources and licence
 

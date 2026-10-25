@@ -168,7 +168,8 @@ This log records what I did in each session, what I learned, where I got stuck, 
 - US EPA, Dynamometer Drive Schedules (UDDS and HWFET speed traces): https://epa.gov/vehicle-and-fuel-emissions-testing/dynamometer-drive-schedules
 - US DOE/EPA, fueleconomy.gov: used to check window-sticker values (2022 Chevrolet Bolt EV, 2024 GMC Hummer EV SUV) and to look up official label MPGe for four well-known EVs (2024 Tesla Model 3 RWD, Tesla Model Y Long Range AWD, Hyundai Ioniq 6 Long Range RWD, Kia EV6 Standard Range RWD): https://www.fueleconomy.gov
 - Kia America, 2024 EV6 pricing release (battery capacity 58.0 kWh and EPA range 232 miles for the EV6 Light RWD): https://kiamedia.com/us/en/models/ev6/2024
-- Carscoops, 2024 Hyundai Ioniq 6 range figures (77.4 kWh battery, EPA range 361 miles for the Long Range RWD on 18-inch wheels): https://carscoops.com/?p=2601849
+- Green Car Reports (n.d.). 2023 Hyundai Ioniq 6 rated at 361 miles, tops Model 3 Long Range. https://www.greencarreports.com/news/1138626_2023-hyundai-ioniq-6-rated-at-361-miles-tops-model-3-long-range (accessed October 2026; 77.4 kWh pack and 361-mile EPA range for the SE Long Range RWD, unchanged for 2024).
+
 
 ### MMA3001 unit notes
 - Week 1: version control, documenting code, responsible use of AI, testing
